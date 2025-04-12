@@ -1,6 +1,9 @@
 plugins {
-    // Apply the application plugin to add support for building a CLI application in Java.
     application
+    jacoco
+    java
+
+    id("com.consentframework.consentmanagement.checkstyle-config") version "1.1.0"
 }
 
 repositories {
@@ -28,6 +31,41 @@ application {
     mainClass = "org.example.App"
 }
 
-tasks.named<Test>("test") {
-    useJUnitPlatform()
+tasks {
+    withType<Test> {
+        useJUnitPlatform()
+        finalizedBy(jacocoTestReport)
+    }
+
+    jacocoTestCoverageVerification {
+        violationRules {
+            rule {
+                limit {
+                    minimum = BigDecimal.valueOf(0.95)
+                }
+            }
+        }
+    }
+
+    build {
+        dependsOn("packageJar")
+    }
+
+    check {
+        // Fail build if under min test coverage thresholds
+        dependsOn(jacocoTestCoverageVerification)
+    }
+}
+
+// Build jar which will later be consumed to run the API service
+tasks.register<Zip>("packageJar") {
+    into("lib") {
+        from(tasks.jar)
+        from(configurations.runtimeClasspath)
+    }
+}
+
+tasks.clean {
+  delete("$rootDir/bin")
+  delete("$rootDir/build")
 }
