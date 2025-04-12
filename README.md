@@ -1,4 +1,7 @@
 # consent-expiry-processor
+
+[![Gradle build](https://github.com/Consent-Management-Platform/consent-expiry-processor/actions/workflows/test.yml/badge.svg)](https://github.com/Consent-Management-Platform/consent-expiry-processor/actions/workflows/test.yml)
+
 Service code for the Consent Auto Expiry Processor, which updates the status of active consents past their scheduled expiry time.
 
 ## Technologies
