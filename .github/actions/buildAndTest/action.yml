@@ -1,0 +1,31 @@
+name: Build Consent Expiry Processor
+
+inputs:
+  github-token:
+    description: 'GitHub token for authentication'
+    required: true
+  github-username:
+    description: 'GitHub username for authentication'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check out package
+      uses: actions/checkout@v4
+      with:
+        # Specify repository so this action can be run from other repositories
+        repository: Consent-Management-Platform/consent-expiry-processor
+        path: consent-management-api
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        distribution: corretto
+        java-version: 21
+    - name: Run gradle build
+      run: gradle wrapper build
+      shell: bash
+      working-directory: consent-expiry-processor
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        GITHUB_USERNAME: ${{ inputs.github-username }}

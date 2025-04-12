@@ -1,0 +1,28 @@
+# This GitHub workflow will automatically build and test code changes
+name: Gradle build
+on:
+  # Run when pushing code or config changes to GitHub
+  push:
+    paths:
+      - '**.java'
+      - '**.yml'
+      - build.gradle.kts
+      - settings.gradle.kts
+  # Run automatically for all pull requests
+  pull_request:
+  # Enable running workflow manually from GitHub Actions
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out package
+        uses: actions/checkout@v4
+      - name: Build Consent Expiry Processor
+        uses: ./.github/actions/buildAndTest
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-username: ${{ github.actor }}
