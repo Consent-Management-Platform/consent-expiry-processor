@@ -8,16 +8,37 @@ plugins {
 
 repositories {
     mavenCentral()
+    repositories {
+        maven {
+            url = uri("https://maven.pkg.github.com/Consent-Management-Platform/consent-api-java-common")
+            credentials {
+                username = project.findProperty("gpr.usr") as String? ?: System.getenv("GITHUB_USERNAME")
+                password = project.findProperty("gpr.key") as String? ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+        maven {
+            url = uri("https://maven.pkg.github.com/Consent-Management-Platform/consent-management-api-models")
+            credentials {
+                username = project.findProperty("gpr.usr") as String? ?: System.getenv("GITHUB_USERNAME")
+                password = project.findProperty("gpr.key") as String? ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
 }
 
 dependencies {
-    // Use JUnit Jupiter for testing.
-    testImplementation(libs.junit.jupiter)
+    // Common Consent Framework API Java libraries
+    implementation("com.consentframework:api-java-common:0.0.11")
 
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    // Consent service models
+    implementation("com.consentframework.consentmanagement:consentmanagement-api-models:0.3.0")
 
-    // This dependency is used by the application.
     implementation(libs.guava)
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.17.1")
+    implementation("jakarta.annotation:jakarta.annotation-api:3.0.0")
+
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 java {
