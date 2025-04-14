@@ -90,7 +90,7 @@ tasks {
     }
 }
 
-// Build jar which will later be consumed to run the API service
+// Build jar which will later be consumed to run the service
 tasks.register<Zip>("packageJar") {
     into("lib") {
         from(tasks.jar)
