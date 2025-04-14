@@ -45,10 +45,12 @@ public class InMemoryConsentRepository implements ConsentRepository {
      */
     @Override
     public ListPage<Consent> getActiveConsentsWithExpiryTimes(final Optional<String> pageToken) {
-        final int firstIndex = pageToken.map(Integer::parseInt).orElse(0);
+        final int firstIndex = pageToken.map(partitionKey -> consents.indexOf(consentsByPartitionKey.get(partitionKey)))
+            .orElse(0);
         final int nextIndex = Math.min(firstIndex + MAX_PAGE_SIZE, consents.size());
 
-        final List<Consent> consentsOnPage = consents.subList(firstIndex, nextIndex);
+        // Copy to a new list to avoid callers indirectly modifying the repository's consent list.
+        final List<Consent> consentsOnPage = List.copyOf(consents.subList(firstIndex, nextIndex));
         final Optional<String> nextPageToken = getNextPageToken(nextIndex);
 
         return new ListPage<>(consentsOnPage, nextPageToken);
@@ -56,7 +58,8 @@ public class InMemoryConsentRepository implements ConsentRepository {
 
     private Optional<String> getNextPageToken(final int nextIndex) {
         if (consents.size() > nextIndex) {
-            return Optional.of(String.valueOf(nextIndex));
+            final String nextConsentPartitionKey = getPartitionKey(consents.get(nextIndex));
+            return Optional.of(nextConsentPartitionKey);
         }
         return Optional.empty();
     }
@@ -67,6 +70,7 @@ public class InMemoryConsentRepository implements ConsentRepository {
     @Override
     public void expireConsent(final String id, final String updatedVersion) {
         final Consent consent = consentsByPartitionKey.get(id);
+        consentsByPartitionKey.remove(id);
         consents.remove(consent);
     }
 

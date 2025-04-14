@@ -33,6 +33,9 @@ public class AutoExpireConsentsActivity {
      * Makes paginated API calls to retrieve active consents with non-null expiry times,
      * in ascending order of expiry time (oldest to newest), and updates the status of
      * each consent to expired if its expiryTime is in the past.
+     *
+     * Assumption: the consents returned by the repository are sorted in ascending order
+     * of expiry time (oldest to newest).
      */
     public void execute() {
         ListPage<Consent> currentPageConsents = consentRepository.getActiveConsentsWithExpiryTimes(Optional.empty());
@@ -64,7 +67,8 @@ public class AutoExpireConsentsActivity {
         final String consentPartitionKey = consentRepository.getPartitionKey(consent);
         logger.info("Consent with partition key {} has expiryTime {} in the past, updating status to EXPIRED.",
             consentPartitionKey, consent.getExpiryTime());
-        consentRepository.expireConsent(consentPartitionKey, consent.getConsentVersion().toString());
+        final String nextConsentVersion = String.valueOf(consent.getConsentVersion() + 1);
+        consentRepository.expireConsent(consentPartitionKey, nextConsentVersion);
     }
 
     /**
@@ -74,7 +78,8 @@ public class AutoExpireConsentsActivity {
      * @return True if the consent's expiryTime is in the past, false otherwise.
      */
     private boolean isPastExpiryTime(final Consent consent) {
-        return consent.getExpiryTime().isBefore(OffsetDateTime.now().withOffsetSameLocal(ZoneOffset.UTC));
+        final OffsetDateTime currentTime = OffsetDateTime.now().withOffsetSameLocal(ZoneOffset.UTC);
+        return consent.getExpiryTime().isBefore(currentTime);
     }
 
     /**

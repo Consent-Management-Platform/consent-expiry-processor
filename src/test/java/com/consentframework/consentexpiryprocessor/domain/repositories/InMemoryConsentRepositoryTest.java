@@ -46,7 +46,7 @@ class InMemoryConsentRepositoryTest {
             pageConsents.resultsOnPage()
         );
         assertEquals(
-            InMemoryConsentRepository.MAX_PAGE_SIZE.toString(),
+            repository.getPartitionKey(TEST_CONSENTS_WITH_MIXED_EXPIRY_TIMES.get(InMemoryConsentRepository.MAX_PAGE_SIZE)),
             pageConsents.nextPageToken().get()
         );
     }
@@ -56,8 +56,9 @@ class InMemoryConsentRepositoryTest {
         final InMemoryConsentRepository repository = new InMemoryConsentRepository(TEST_CONSENTS_WITH_MIXED_EXPIRY_TIMES);
 
         final int startingIndex = 2;
-        final Optional<String> providedNextPageToken = Optional.of(String.valueOf(startingIndex));
-
+        final Optional<String> providedNextPageToken = Optional.of(repository.getPartitionKey(
+            TEST_CONSENTS_WITH_MIXED_EXPIRY_TIMES.get(startingIndex)
+        ));
         final ListPage<Consent> pageConsents = repository.getActiveConsentsWithExpiryTimes(providedNextPageToken);
 
         assertNotNull(pageConsents);
@@ -66,7 +67,9 @@ class InMemoryConsentRepositoryTest {
             pageConsents.resultsOnPage()
         );
         assertEquals(
-            String.valueOf(startingIndex + InMemoryConsentRepository.MAX_PAGE_SIZE),
+            repository.getPartitionKey(
+                TEST_CONSENTS_WITH_MIXED_EXPIRY_TIMES.get(startingIndex + InMemoryConsentRepository.MAX_PAGE_SIZE)
+            ),
             pageConsents.nextPageToken().get()
         );
     }
@@ -76,8 +79,9 @@ class InMemoryConsentRepositoryTest {
         final InMemoryConsentRepository repository = new InMemoryConsentRepository(TEST_CONSENTS_WITH_MIXED_EXPIRY_TIMES);
 
         final int startingIndex = 4;
-        final Optional<String> providedNextPageToken = Optional.of(String.valueOf(startingIndex));
-
+        final Optional<String> providedNextPageToken = Optional.of(repository.getPartitionKey(
+            TEST_CONSENTS_WITH_MIXED_EXPIRY_TIMES.get(startingIndex)
+        ));
         final ListPage<Consent> pageConsents = repository.getActiveConsentsWithExpiryTimes(providedNextPageToken);
 
         assertNotNull(pageConsents);
