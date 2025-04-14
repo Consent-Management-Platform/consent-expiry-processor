@@ -33,6 +33,9 @@ dependencies {
     // Consent service models
     implementation("com.consentframework.consentmanagement:consentmanagement-api-models:0.3.0")
 
+    // AWS Lambda SDK
+    implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
+
     implementation(libs.guava)
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.1")
     implementation("jakarta.annotation:jakarta.annotation-api:3.0.0")
@@ -58,7 +61,7 @@ java {
 
 application {
     // Define the main class for the application.
-    mainClass = "org.example.App"
+    mainClass = "com.consentframework.consentexpiryprocessor.ConsentExpiryProcessor"
 }
 
 tasks {

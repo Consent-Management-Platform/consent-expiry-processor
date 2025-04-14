@@ -11,6 +11,8 @@ import java.util.Optional;
 
 /**
  * In-memory implementation of the consent repository, used for testing.
+ *
+ * Once have implemented the DynamoDB consent repository, this class will be moved to the test directory.
  */
 public class InMemoryConsentRepository implements ConsentRepository {
     public static final Integer MAX_PAGE_SIZE = 2;
