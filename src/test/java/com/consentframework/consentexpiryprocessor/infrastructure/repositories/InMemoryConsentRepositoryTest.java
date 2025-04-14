@@ -1,4 +1,4 @@
-package com.consentframework.consentexpiryprocessor.domain.repositories;
+package com.consentframework.consentexpiryprocessor.infrastructure.repositories;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

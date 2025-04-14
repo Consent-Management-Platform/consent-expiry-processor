@@ -2,7 +2,7 @@ package com.consentframework.consentexpiryprocessor;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.consentframework.consentexpiryprocessor.domain.repositories.ConsentRepository;
-import com.consentframework.consentexpiryprocessor.domain.repositories.InMemoryConsentRepository;
+import com.consentframework.consentexpiryprocessor.infrastructure.repositories.InMemoryConsentRepository;
 import com.consentframework.consentexpiryprocessor.usecases.activities.AutoExpireConsentsActivity;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

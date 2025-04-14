@@ -1,5 +1,6 @@
-package com.consentframework.consentexpiryprocessor.domain.repositories;
+package com.consentframework.consentexpiryprocessor.infrastructure.repositories;
 
+import com.consentframework.consentexpiryprocessor.domain.repositories.ConsentRepository;
 import com.consentframework.consentmanagement.api.models.Consent;
 import com.consentframework.shared.api.domain.pagination.ListPage;
 

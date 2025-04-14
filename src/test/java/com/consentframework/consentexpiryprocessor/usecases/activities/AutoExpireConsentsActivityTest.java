@@ -8,7 +8,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 import com.consentframework.consentexpiryprocessor.domain.repositories.ConsentRepository;
-import com.consentframework.consentexpiryprocessor.domain.repositories.InMemoryConsentRepository;
+import com.consentframework.consentexpiryprocessor.infrastructure.repositories.InMemoryConsentRepository;
 import com.consentframework.consentexpiryprocessor.testcommon.utils.ConsentGenerator;
 import com.consentframework.consentmanagement.api.models.Consent;
 import com.consentframework.shared.api.domain.pagination.ListPage;
