@@ -2,32 +2,73 @@ package com.consentframework.consentexpiryprocessor.infrastructure.repositories;
 
 import com.consentframework.consentexpiryprocessor.domain.entities.ActiveConsentWithExpiryTime;
 import com.consentframework.consentexpiryprocessor.domain.repositories.ConsentRepository;
+import com.consentframework.consentexpiryprocessor.infrastructure.mappers.DynamoDbExpiryHourTokenMapper;
 import com.consentframework.shared.api.domain.pagination.ListPage;
-import com.consentframework.shared.api.infrastructure.entities.DynamoDbServiceUserConsent;
+import com.consentframework.shared.api.infrastructure.entities.DynamoDbActiveConsentWithExpiryTime;
+import com.consentframework.shared.api.infrastructure.entities.StoredConsentImage;
+import com.consentframework.shared.api.infrastructure.mappers.DynamoDbConsentExpiryTimeConverter;
+import software.amazon.awssdk.core.pagination.sync.SdkIterable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.model.Page;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
  * DynamoDB implementation of the consent repository.
  */
 public class DynamoDbConsentRepository implements ConsentRepository {
+    // How many days in the past to query for consents to expire.
+    private static final long NUMBER_PAST_DAYS_TO_EXPIRE_CONSENTS = 3;
+
+    private final DynamoDbTable<DynamoDbActiveConsentWithExpiryTime> consentTable;
+
     /**
      * Initializes a new DynamoDB consent repository.
      *
      * @param consentTable The DynamoDB table to use for storing consents.
      */
-    public DynamoDbConsentRepository(final DynamoDbTable<DynamoDbServiceUserConsent> consentTable) {
+    public DynamoDbConsentRepository(final DynamoDbTable<DynamoDbActiveConsentWithExpiryTime> consentTable) {
+        this.consentTable = consentTable;
     }
 
     /**
      * Retrieves a paginated list of active consents with non-null expiry times.
-     *
-     * TODO: Implement logic to retrieve active consents with non-null expiry times.
      */
     @Override
     public ListPage<ActiveConsentWithExpiryTime> getActiveConsentsWithExpiryTimes(final Optional<String> pageToken) {
-        throw new UnsupportedOperationException("Unimplemented method 'getActiveConsentsWithExpiryTimes'");
+        final QueryEnhancedRequest queryRequest = buildGetConsentsToExpireQueryRequest(pageToken);
+
+        final SdkIterable<Page<DynamoDbActiveConsentWithExpiryTime>> queryResults = consentTable
+            .index(DynamoDbActiveConsentWithExpiryTime.ACTIVE_CONSENTS_BY_EXPIRY_HOUR_GSI_NAME)
+            .query(queryRequest);
+        if (queryResults == null) {
+            return null;
+        }
+
+        return queryResults.stream()
+            .findFirst()
+            .map(pageResults -> {
+                final Optional<String> nextPageToken = getNextPageToken(pageResults);
+                final List<ActiveConsentWithExpiryTime> consents = pageResults.items()
+                    .stream()
+                    .map(ddbActiveConsentGsiItem -> ActiveConsentWithExpiryTime.builder()
+                        .id(ddbActiveConsentGsiItem.id())
+                        .consentVersion(ddbActiveConsentGsiItem.consentVersion())
+                        .expiryHour(ddbActiveConsentGsiItem.expiryHour())
+                        .expiryTimeId(ddbActiveConsentGsiItem.expiryTimeId())
+                        .build()
+                    )
+                    .toList();
+                return new ListPage<ActiveConsentWithExpiryTime>(consents, nextPageToken);
+            })
+            .orElse(null);
     }
 
     /**
@@ -41,5 +82,32 @@ public class DynamoDbConsentRepository implements ConsentRepository {
     @Override
     public void expireConsent(final String id, final String updatedVersion) {
         throw new UnsupportedOperationException("Unimplemented method 'expireConsent'");
+    }
+
+    private QueryEnhancedRequest buildGetConsentsToExpireQueryRequest(final Optional<String> pageToken) {
+        final Map<String, AttributeValue> exclusiveStartKey = DynamoDbExpiryHourTokenMapper.toDynamoDbPageToken(pageToken);
+        final String currentExpiryHour = getExpiryHourToQuery(exclusiveStartKey);
+
+        final QueryConditional queryCondition = QueryConditional.keyEqualTo(Key.builder()
+            .partitionValue(currentExpiryHour)
+            .build());
+        return QueryEnhancedRequest.builder()
+            .queryConditional(queryCondition)
+            .exclusiveStartKey(exclusiveStartKey)
+            .build();
+    }
+
+    private Optional<String> getNextPageToken(final Page<DynamoDbActiveConsentWithExpiryTime> pageResults) {
+        final Map<String, AttributeValue> lastEvaluatedKey = pageResults.lastEvaluatedKey();
+        return DynamoDbExpiryHourTokenMapper.toJsonString(lastEvaluatedKey);
+    }
+
+    private String getExpiryHourToQuery(final Map<String, AttributeValue> exclusiveStartKey) {
+        if (exclusiveStartKey != null) {
+            return exclusiveStartKey.get(StoredConsentImage.JSON_PROPERTY_EXPIRY_HOUR).s();
+        }
+
+        final OffsetDateTime earliestTimeToExpire = OffsetDateTime.now().minusDays(NUMBER_PAST_DAYS_TO_EXPIRE_CONSENTS);
+        return DynamoDbConsentExpiryTimeConverter.toExpiryHour(earliestTimeToExpire);
     }
 }

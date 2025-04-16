@@ -28,7 +28,7 @@ repositories {
 
 dependencies {
     // Common Consent Framework API Java libraries
-    implementation("com.consentframework:api-java-common:0.0.17")
+    implementation("com.consentframework:api-java-common:0.0.18")
 
     // AWS DynamoDB SDK
     implementation("software.amazon.awssdk:dynamodb-enhanced:2.26.7")
