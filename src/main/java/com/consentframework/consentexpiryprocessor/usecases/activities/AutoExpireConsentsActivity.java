@@ -16,7 +16,8 @@ import java.util.Optional;
  */
 public class AutoExpireConsentsActivity {
     private static final Logger logger = LogManager.getLogger(AutoExpireConsentsActivity.class);
-    private static final long NUMBER_PAST_DAYS_TO_EXPIRE_CONSENTS = 3;
+
+    static final int NUMBER_PAST_DAYS_TO_EXPIRE_CONSENTS = 3;
 
     private final ConsentRepository consentRepository;
 
@@ -38,15 +39,21 @@ public class AutoExpireConsentsActivity {
      *
      * Assumption: the consents returned by the repository are sorted in ascending order
      * of expiry time (oldest to newest).
-     *
-     * TODO: Implement algorithm to query for consents from each expiry hour time bucket
-     * from the last NUMBER_PAST_DAYS_TO_EXPIRE_CONSENTS days.
      */
     public void execute() {
-        final OffsetDateTime earliestTimeToExpire = OffsetDateTime.now().minusDays(NUMBER_PAST_DAYS_TO_EXPIRE_CONSENTS);
-        final String firstExpiryHour = DynamoDbConsentExpiryTimeConverter.toExpiryHour(earliestTimeToExpire);
+        for (int hoursAgo = NUMBER_PAST_DAYS_TO_EXPIRE_CONSENTS * 24 - 1; hoursAgo >= 0; hoursAgo--) {
+            final String expiryHour = DynamoDbConsentExpiryTimeConverter.toExpiryHour(
+                OffsetDateTime.now().minusHours(hoursAgo)
+            );
+            processActiveConsentsWithExpiryHour(expiryHour);
+        }
+
+        logger.info("No more consents to auto-expire, ending auto-expire consent activity.");
+    }
+
+    private void processActiveConsentsWithExpiryHour(final String expiryHour) {
         ListPage<ActiveConsentWithExpiryTime> currentPageConsents = consentRepository.getActiveConsentsWithExpiryHour(
-            firstExpiryHour, Optional.empty());
+            expiryHour, Optional.empty());
 
         while (currentPageConsents != null && currentPageConsents.resultsOnPage() != null) {
             logger.info("Processing page of {} active consents with expiry times.", currentPageConsents.resultsOnPage().size());
@@ -60,10 +67,8 @@ public class AutoExpireConsentsActivity {
                 expireConsent(consent);
             }
 
-            currentPageConsents = getNextPage(firstExpiryHour, currentPageConsents);
+            currentPageConsents = getNextPage(expiryHour, currentPageConsents);
         }
-
-        logger.info("No more consents to auto-expire, ending auto-expire consent activity.");
     }
 
     /**

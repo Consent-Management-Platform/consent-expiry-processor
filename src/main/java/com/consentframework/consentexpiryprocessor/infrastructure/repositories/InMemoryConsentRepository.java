@@ -18,10 +18,10 @@ import java.util.Optional;
 public class InMemoryConsentRepository implements ConsentRepository {
     public static final Integer MAX_PAGE_SIZE = 2;
 
-    // In-memory list of consent index items
-    final List<ActiveConsentWithExpiryTime> consents = new ArrayList<>();
+    // In-memory map from expiry hour to active consents with expiry times during that hour
+    final Map<String, List<ActiveConsentWithExpiryTime>> activeConsentsPerExpiryHour = new HashMap<>();
 
-    // Map from consent partition key to consent object
+    // Map from consent partition key to consent object, enables expiring consents by id
     final Map<String, ActiveConsentWithExpiryTime> consentsByPartitionKey = new HashMap<>();
 
     /**
@@ -30,16 +30,18 @@ public class InMemoryConsentRepository implements ConsentRepository {
     public InMemoryConsentRepository() {}
 
     /**
-     * Constructs an in-memory consent repository pre-populated with a list of consents.
-     *
-     * @param consents The list of consents to add to the repository.
+     * Constructs an in-memory consent repository pre-populated with consents.
      */
-    public InMemoryConsentRepository(final List<ActiveConsentWithExpiryTime> consents) {
-        consents.forEach(consent -> {
-            this.consents.add(consent);
+    public InMemoryConsentRepository(final Map<String, List<ActiveConsentWithExpiryTime>> consentsByExpiryHour) {
+        consentsByExpiryHour.forEach((expiryHour, consents) -> {
+            // Make a mutable copy of the input list to avoid modifying the caller's list,
+            // and to allow adding/removing consents from the in-memory repository.
+            final List<ActiveConsentWithExpiryTime> consentsExpiringInHour = new ArrayList<>();
+            consentsExpiringInHour.addAll(consents);
 
-            final String partitionKey = consent.id();
-            consentsByPartitionKey.put(partitionKey, consent);
+            activeConsentsPerExpiryHour.put(expiryHour, consentsExpiringInHour);
+
+            consentsExpiringInHour.forEach(consent -> consentsByPartitionKey.put(consent.id(), consent));
         });
     }
 
@@ -49,23 +51,30 @@ public class InMemoryConsentRepository implements ConsentRepository {
     @Override
     public ListPage<ActiveConsentWithExpiryTime> getActiveConsentsWithExpiryHour(final String expiryHour,
             final Optional<String> pageToken) {
+        final List<ActiveConsentWithExpiryTime> consents = activeConsentsPerExpiryHour.get(expiryHour);
+        if (consents == null) {
+            return new ListPage<>(List.of(), Optional.empty());
+        }
+
         final int firstIndex = pageToken.map(partitionKey -> consents.indexOf(consentsByPartitionKey.get(partitionKey)))
             .orElse(0);
         final int nextIndex = Math.min(firstIndex + MAX_PAGE_SIZE, consents.size());
 
         // Copy to a new list to avoid callers indirectly modifying the repository's consent list.
         final List<ActiveConsentWithExpiryTime> consentsOnPage = List.copyOf(consents.subList(firstIndex, nextIndex));
-        final Optional<String> nextPageToken = getNextPageToken(nextIndex);
+        final Optional<String> nextPageToken = getNextPageToken(expiryHour, nextIndex);
 
         return new ListPage<>(consentsOnPage, nextPageToken);
     }
 
-    private Optional<String> getNextPageToken(final int nextIndex) {
-        if (consents.size() > nextIndex) {
-            final String nextConsentPartitionKey = consents.get(nextIndex).id();
-            return Optional.of(nextConsentPartitionKey);
+    private Optional<String> getNextPageToken(final String expiryHour, final int nextIndex) {
+        final List<ActiveConsentWithExpiryTime> consents = activeConsentsPerExpiryHour.get(expiryHour);
+        if (consents == null || consents.size() <= nextIndex) {
+            return Optional.empty();
         }
-        return Optional.empty();
+
+        final String nextConsentPartitionKey = consents.get(nextIndex).id();
+        return Optional.of(nextConsentPartitionKey);
     }
 
     /**
@@ -75,6 +84,11 @@ public class InMemoryConsentRepository implements ConsentRepository {
     public void expireConsent(final String id, final String updatedVersion) {
         final ActiveConsentWithExpiryTime consent = consentsByPartitionKey.get(id);
         consentsByPartitionKey.remove(id);
-        consents.remove(consent);
+
+        final String expiryHour = consent.expiryHour();
+        final List<ActiveConsentWithExpiryTime> consentsExpiringThisHour = activeConsentsPerExpiryHour.get(expiryHour);
+        if (consentsExpiringThisHour != null) {
+            consentsExpiringThisHour.remove(consent);
+        }
     }
 }
