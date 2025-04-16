@@ -1,6 +1,8 @@
 package com.consentframework.consentexpiryprocessor.usecases.activities;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -33,7 +35,7 @@ class AutoExpireConsentsActivityTest {
     void executeWhenNullPageReturned() {
         final InMemoryConsentRepository repository = mock(InMemoryConsentRepository.class);
         final Optional<String> expectedGetActiveConsentsInput = Optional.empty();
-        doReturn(null).when(repository).getActiveConsentsWithExpiryTimes(expectedGetActiveConsentsInput);
+        doReturn(null).when(repository).getActiveConsentsWithExpiryHour(anyString(), eq(expectedGetActiveConsentsInput));
 
         new AutoExpireConsentsActivity(repository).execute();
 
@@ -45,7 +47,7 @@ class AutoExpireConsentsActivityTest {
         final InMemoryConsentRepository repository = mock(InMemoryConsentRepository.class);
         final Optional<String> expectedGetActiveConsentsInput = Optional.empty();
         final ListPage<ActiveConsentWithExpiryTime> mockPageConsents = new ListPage<>(null, Optional.empty());
-        doReturn(mockPageConsents).when(repository).getActiveConsentsWithExpiryTimes(expectedGetActiveConsentsInput);
+        doReturn(mockPageConsents).when(repository).getActiveConsentsWithExpiryHour(anyString(), eq(expectedGetActiveConsentsInput));
 
         new AutoExpireConsentsActivity(repository).execute();
 
@@ -69,17 +71,17 @@ class AutoExpireConsentsActivityTest {
 
         final List<String> partitionKeys = consents.stream().map(ActiveConsentWithExpiryTime::id).toList();
 
-        verify(repository).getActiveConsentsWithExpiryTimes(Optional.empty());
-        verify(repository).getActiveConsentsWithExpiryTimes(Optional.of(partitionKeys.get(2)));
-        verify(repository).getActiveConsentsWithExpiryTimes(Optional.of(partitionKeys.get(4)));
-        verify(repository, never()).getActiveConsentsWithExpiryTimes(Optional.of(partitionKeys.get(6)));
+        verify(repository).getActiveConsentsWithExpiryHour(anyString(), eq(Optional.empty()));
+        verify(repository).getActiveConsentsWithExpiryHour(anyString(), eq(Optional.of(partitionKeys.get(2))));
+        verify(repository).getActiveConsentsWithExpiryHour(anyString(), eq(Optional.of(partitionKeys.get(4))));
+        verify(repository, never()).getActiveConsentsWithExpiryHour(anyString(), eq(Optional.of(partitionKeys.get(6))));
 
         partitionKeys.subList(0, 5).forEach(partitionKey -> verify(repository).expireConsent(partitionKey, "2"));
         partitionKeys.subList(5, consents.size()).forEach(partitionKey -> verify(repository, never()).expireConsent(partitionKey, "2"));
     }
 
     private void validateNoConsentsExpired(final ConsentRepository repository) {
-        verify(repository).getActiveConsentsWithExpiryTimes(Optional.empty());
+        verify(repository).getActiveConsentsWithExpiryHour(anyString(), eq(Optional.empty()));
         verify(repository, never()).expireConsent(any(), any());
     }
 

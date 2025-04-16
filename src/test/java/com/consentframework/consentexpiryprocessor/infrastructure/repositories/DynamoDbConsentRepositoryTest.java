@@ -37,7 +37,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 class DynamoDbConsentRepositoryTest {
-    private static final OffsetDateTime FUTURE_EXPIRY_TIME = OffsetDateTime.now().plusDays(30);
+    private static final OffsetDateTime FUTURE_EXPIRY_TIME = OffsetDateTime.now().plusMinutes(10);
     private static final List<DynamoDbActiveConsentWithExpiryTime> ACTIVE_CONSENTS_WITH_EXPIRY = List.of(
         DynamoDbActiveConsentWithExpiryTime.builder()
             .id(TestConstants.TEST_PARTITION_KEY)
@@ -106,7 +106,7 @@ class DynamoDbConsentRepositoryTest {
         mockIndexQueryResults(null);
 
         final ConsentRepository repository = new DynamoDbConsentRepository(consentTable);
-        assertNull(repository.getActiveConsentsWithExpiryTimes(Optional.of(NEXT_TOKEN_JSON_STRING)));
+        assertNull(repository.getActiveConsentsWithExpiryHour(TestConstants.TEST_EXPIRY_HOUR, Optional.of(NEXT_TOKEN_JSON_STRING)));
     }
 
     @Test
@@ -118,7 +118,8 @@ class DynamoDbConsentRepositoryTest {
         mockIndexQueryResults(queryResults);
 
         final ConsentRepository repository = new DynamoDbConsentRepository(consentTable);
-        final ListPage<ActiveConsentWithExpiryTime> matchingConsentsPage = repository.getActiveConsentsWithExpiryTimes(Optional.empty());
+        final ListPage<ActiveConsentWithExpiryTime> matchingConsentsPage = repository.getActiveConsentsWithExpiryHour(
+            TestConstants.TEST_EXPIRY_HOUR, Optional.empty());
         assertNotNull(matchingConsentsPage);
 
         final List<ActiveConsentWithExpiryTime> consents = matchingConsentsPage.resultsOnPage();
@@ -141,7 +142,8 @@ class DynamoDbConsentRepositoryTest {
         mockIndexQueryResults(queryResults);
 
         final ConsentRepository repository = new DynamoDbConsentRepository(consentTable);
-        final ListPage<ActiveConsentWithExpiryTime> matchingConsentsPage = repository.getActiveConsentsWithExpiryTimes(Optional.empty());
+        final ListPage<ActiveConsentWithExpiryTime> matchingConsentsPage = repository.getActiveConsentsWithExpiryHour(
+            TestConstants.TEST_EXPIRY_HOUR, Optional.empty());
         assertNotNull(matchingConsentsPage);
 
         final List<ActiveConsentWithExpiryTime> consents = matchingConsentsPage.resultsOnPage();

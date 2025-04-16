@@ -16,6 +16,7 @@ import java.util.Optional;
  */
 public class AutoExpireConsentsActivity {
     private static final Logger logger = LogManager.getLogger(AutoExpireConsentsActivity.class);
+    private static final long NUMBER_PAST_DAYS_TO_EXPIRE_CONSENTS = 3;
 
     private final ConsentRepository consentRepository;
 
@@ -37,9 +38,15 @@ public class AutoExpireConsentsActivity {
      *
      * Assumption: the consents returned by the repository are sorted in ascending order
      * of expiry time (oldest to newest).
+     *
+     * TODO: Implement algorithm to query for consents from each expiry hour time bucket
+     * from the last NUMBER_PAST_DAYS_TO_EXPIRE_CONSENTS days.
      */
     public void execute() {
-        ListPage<ActiveConsentWithExpiryTime> currentPageConsents = consentRepository.getActiveConsentsWithExpiryTimes(Optional.empty());
+        final OffsetDateTime earliestTimeToExpire = OffsetDateTime.now().minusDays(NUMBER_PAST_DAYS_TO_EXPIRE_CONSENTS);
+        final String firstExpiryHour = DynamoDbConsentExpiryTimeConverter.toExpiryHour(earliestTimeToExpire);
+        ListPage<ActiveConsentWithExpiryTime> currentPageConsents = consentRepository.getActiveConsentsWithExpiryHour(
+            firstExpiryHour, Optional.empty());
 
         while (currentPageConsents != null && currentPageConsents.resultsOnPage() != null) {
             logger.info("Processing page of {} active consents with expiry times.", currentPageConsents.resultsOnPage().size());
@@ -53,7 +60,7 @@ public class AutoExpireConsentsActivity {
                 expireConsent(consent);
             }
 
-            currentPageConsents = getNextPage(currentPageConsents);
+            currentPageConsents = getNextPage(firstExpiryHour, currentPageConsents);
         }
 
         logger.info("No more consents to auto-expire, ending auto-expire consent activity.");
@@ -90,11 +97,12 @@ public class AutoExpireConsentsActivity {
      * @param currentPageConsents The current page of consents.
      * @return The next page of consents, or null if there are no more pages.
      */
-    private ListPage<ActiveConsentWithExpiryTime> getNextPage(final ListPage<ActiveConsentWithExpiryTime> currentPageConsents) {
+    private ListPage<ActiveConsentWithExpiryTime> getNextPage(final String expiryHour,
+            final ListPage<ActiveConsentWithExpiryTime> currentPageConsents) {
         final Optional<String> nextPageToken = currentPageConsents.nextPageToken();
         if (nextPageToken.isPresent()) {
             logger.info("Retrieving next page of consents.");
-            return consentRepository.getActiveConsentsWithExpiryTimes(nextPageToken);
+            return consentRepository.getActiveConsentsWithExpiryHour(expiryHour, nextPageToken);
         }
         return null;
     }

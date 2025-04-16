@@ -47,7 +47,8 @@ public class InMemoryConsentRepository implements ConsentRepository {
      * Retrieves a paginated list of active consents with non-null expiry times.
      */
     @Override
-    public ListPage<ActiveConsentWithExpiryTime> getActiveConsentsWithExpiryTimes(final Optional<String> pageToken) {
+    public ListPage<ActiveConsentWithExpiryTime> getActiveConsentsWithExpiryHour(final String expiryHour,
+            final Optional<String> pageToken) {
         final int firstIndex = pageToken.map(partitionKey -> consents.indexOf(consentsByPartitionKey.get(partitionKey)))
             .orElse(0);
         final int nextIndex = Math.min(firstIndex + MAX_PAGE_SIZE, consents.size());

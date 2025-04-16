@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.consentframework.consentexpiryprocessor.domain.entities.ActiveConsentWithExpiryTime;
+import com.consentframework.consentexpiryprocessor.testcommon.constants.TestConstants;
 import com.consentframework.consentexpiryprocessor.testcommon.utils.ActiveConsentWithExpiryTimeGenerator;
 import com.consentframework.shared.api.domain.pagination.ListPage;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,8 @@ class InMemoryConsentRepositoryTest {
     void getActiveConsentsWithExpiryTimesWhenEmpty() {
         final InMemoryConsentRepository repository = new InMemoryConsentRepository();
 
-        final ListPage<ActiveConsentWithExpiryTime> pageConsents = repository.getActiveConsentsWithExpiryTimes(Optional.empty());
+        final ListPage<ActiveConsentWithExpiryTime> pageConsents = repository.getActiveConsentsWithExpiryHour(
+            TestConstants.TEST_EXPIRY_HOUR, Optional.empty());
 
         assertNotNull(pageConsents);
         assertTrue(pageConsents.resultsOnPage().isEmpty());
@@ -38,7 +40,8 @@ class InMemoryConsentRepositoryTest {
     void getActiveConsentsWithExpiryTimes_firstPage() {
         final InMemoryConsentRepository repository = new InMemoryConsentRepository(TEST_CONSENTS_WITH_MIXED_EXPIRY_TIMES);
 
-        final ListPage<ActiveConsentWithExpiryTime> pageConsents = repository.getActiveConsentsWithExpiryTimes(Optional.empty());
+        final ListPage<ActiveConsentWithExpiryTime> pageConsents = repository.getActiveConsentsWithExpiryHour(
+            TestConstants.TEST_EXPIRY_HOUR, Optional.empty());
 
         assertNotNull(pageConsents);
         assertEquals(
@@ -57,7 +60,8 @@ class InMemoryConsentRepositoryTest {
 
         final int startingIndex = 2;
         final Optional<String> providedNextPageToken = Optional.of(TEST_CONSENTS_WITH_MIXED_EXPIRY_TIMES.get(startingIndex).id());
-        final ListPage<ActiveConsentWithExpiryTime> pageConsents = repository.getActiveConsentsWithExpiryTimes(providedNextPageToken);
+        final ListPage<ActiveConsentWithExpiryTime> pageConsents = repository.getActiveConsentsWithExpiryHour(
+            TestConstants.TEST_EXPIRY_HOUR, providedNextPageToken);
 
         assertNotNull(pageConsents);
         assertEquals(
@@ -77,7 +81,8 @@ class InMemoryConsentRepositoryTest {
         final int startingIndex = 4;
         final Optional<String> providedNextPageToken = Optional.of(
             TEST_CONSENTS_WITH_MIXED_EXPIRY_TIMES.get(startingIndex).id());
-        final ListPage<ActiveConsentWithExpiryTime> pageConsents = repository.getActiveConsentsWithExpiryTimes(providedNextPageToken);
+        final ListPage<ActiveConsentWithExpiryTime> pageConsents = repository.getActiveConsentsWithExpiryHour(
+            TestConstants.TEST_EXPIRY_HOUR, providedNextPageToken);
 
         assertNotNull(pageConsents);
         assertEquals(
@@ -96,7 +101,7 @@ class InMemoryConsentRepositoryTest {
         repository.expireConsent(TEST_CONSENTS_WITH_MIXED_EXPIRY_TIMES.get(4).id(), "2");
 
         final List<ActiveConsentWithExpiryTime> activeConsents = repository
-            .getActiveConsentsWithExpiryTimes(Optional.empty())
+            .getActiveConsentsWithExpiryHour(TestConstants.TEST_EXPIRY_HOUR, Optional.empty())
             .resultsOnPage();
         assertEquals(2, activeConsents.size());
         assertEquals(TEST_CONSENTS_WITH_MIXED_EXPIRY_TIMES.get(0), activeConsents.get(0));

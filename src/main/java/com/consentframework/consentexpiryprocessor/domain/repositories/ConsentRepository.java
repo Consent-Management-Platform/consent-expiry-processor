@@ -12,10 +12,11 @@ public interface ConsentRepository {
     /**
      * Retrieves a paginated list of active consents with non-null expiry times.
      *
+     * @param expiryHour The expiry hour to query for, with format "2021-12-31T23:00Z".
      * @param pageToken The page token for pagination, null if retrieving the first page.
      * @return paginated list of consents, or null if no results found.
      */
-    ListPage<ActiveConsentWithExpiryTime> getActiveConsentsWithExpiryTimes(final Optional<String> pageToken);
+    ListPage<ActiveConsentWithExpiryTime> getActiveConsentsWithExpiryHour(final String expiryHour, final Optional<String> pageToken);
 
     /**
      * Updates the status of a consent to expired.
