@@ -15,10 +15,12 @@ import com.consentframework.consentexpiryprocessor.domain.repositories.ConsentRe
 import com.consentframework.consentexpiryprocessor.infrastructure.repositories.InMemoryConsentRepository;
 import com.consentframework.consentexpiryprocessor.testcommon.utils.ActiveConsentWithExpiryTimeGenerator;
 import com.consentframework.shared.api.domain.pagination.ListPage;
+import com.consentframework.shared.api.infrastructure.mappers.DynamoDbConsentExpiryTimeConverter;
 import org.junit.jupiter.api.Test;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -58,33 +60,44 @@ class AutoExpireConsentsActivityTest {
 
     @Test
     void executeWhenMultiplePageResults() {
-        final List<ActiveConsentWithExpiryTime> consentsExpiringThisHour = List.of(
-            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), nowPlusMinutes(-50)),
-            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), nowPlusMinutes(-40)),
-            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), nowPlusMinutes(-30)),
-            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), nowPlusMinutes(-20)),
-            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), nowPlusMinutes(-10)),
-            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), nowPlusMinutes(10)),
-            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), nowPlusMinutes(240))
+        final OffsetDateTime firstHourDatetime = OffsetDateTime.now().minusHours(2).truncatedTo(ChronoUnit.HOURS);
+        final String firstExpiryHour = DynamoDbConsentExpiryTimeConverter.toExpiryHour(firstHourDatetime);
+        final String currentExpiryHour = DynamoDbConsentExpiryTimeConverter.toExpiryHour(firstHourDatetime.plusHours(2));
+
+        final List<ActiveConsentWithExpiryTime> consentsExpiringFirstHour = List.of(
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), firstHourDatetime.plusMinutes(1)),
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), firstHourDatetime.plusMinutes(10)),
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), firstHourDatetime.plusMinutes(20)),
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), firstHourDatetime.plusMinutes(30)),
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), firstHourDatetime.plusMinutes(40))
         );
-        final String expiryHour = consentsExpiringThisHour.get(0).expiryHour();
+        final List<ActiveConsentWithExpiryTime> consentsExpiringCurrentHour = List.of(
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), OffsetDateTime.now().minusSeconds(1)),
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), OffsetDateTime.now().plusMinutes(5)),
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), OffsetDateTime.now().plusMinutes(15))
+        );
         final Map<String, List<ActiveConsentWithExpiryTime>> consentsExpiringPerHour = Map.of(
-            expiryHour, consentsExpiringThisHour);
+            firstExpiryHour, consentsExpiringFirstHour,
+            currentExpiryHour, consentsExpiringCurrentHour);
         final InMemoryConsentRepository repository = spy(new InMemoryConsentRepository(consentsExpiringPerHour));
 
         new AutoExpireConsentsActivity(repository).execute();
 
-        final List<String> partitionKeys = consentsExpiringThisHour.stream().map(ActiveConsentWithExpiryTime::id).toList();
+        final List<String> firstHourPartitionKeys = consentsExpiringFirstHour.stream()
+            .map(ActiveConsentWithExpiryTime::id).toList();
+        final List<String> currentHourPartitionKeys = consentsExpiringCurrentHour.stream()
+            .map(ActiveConsentWithExpiryTime::id).toList();
 
         final int expectedNumExpiryHoursProcessed = AutoExpireConsentsActivity.NUMBER_PAST_DAYS_TO_EXPIRE_CONSENTS * 24;
         verify(repository, times(expectedNumExpiryHoursProcessed))
             .getActiveConsentsWithExpiryHour(anyString(), eq(Optional.empty()));
-        verify(repository).getActiveConsentsWithExpiryHour(expiryHour, Optional.of(partitionKeys.get(2)));
-        verify(repository).getActiveConsentsWithExpiryHour(expiryHour, Optional.of(partitionKeys.get(4)));
-        verify(repository, never()).getActiveConsentsWithExpiryHour(expiryHour, Optional.of(partitionKeys.get(6)));
+        verify(repository).getActiveConsentsWithExpiryHour(firstExpiryHour, Optional.of(firstHourPartitionKeys.get(2)));
+        verify(repository).getActiveConsentsWithExpiryHour(firstExpiryHour, Optional.of(firstHourPartitionKeys.get(4)));
+        verify(repository, never()).getActiveConsentsWithExpiryHour(currentExpiryHour, Optional.of(currentHourPartitionKeys.get(2)));
 
-        partitionKeys.subList(0, 5).forEach(partitionKey -> verify(repository).expireConsent(partitionKey, "2"));
-        partitionKeys.subList(5, consentsExpiringThisHour.size()).forEach(partitionKey ->
+        firstHourPartitionKeys.forEach(partitionKey -> verify(repository).expireConsent(partitionKey, "2"));
+        verify(repository).expireConsent(currentHourPartitionKeys.get(0), "2");
+        currentHourPartitionKeys.subList(1, currentHourPartitionKeys.size()).forEach(partitionKey ->
             verify(repository, never()).expireConsent(partitionKey, "2"));
     }
 
