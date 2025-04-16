@@ -28,10 +28,10 @@ repositories {
 
 dependencies {
     // Common Consent Framework API Java libraries
-    implementation("com.consentframework:api-java-common:0.0.11")
+    implementation("com.consentframework:api-java-common:0.0.17")
 
-    // Consent service models
-    implementation("com.consentframework.consentmanagement:consentmanagement-api-models:0.3.0")
+    // AWS DynamoDB SDK
+    implementation("software.amazon.awssdk:dynamodb-enhanced:2.26.7")
 
     // AWS Lambda SDK
     implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
@@ -44,6 +44,13 @@ dependencies {
     val log4j2Version = "2.24.3"
     implementation("org.apache.logging.log4j:log4j-api:$log4j2Version")
     implementation("org.apache.logging.log4j:log4j-core:$log4j2Version")
+
+    // Immutables
+    val immutablesDependency = "org.immutables:value:2.10.1"
+    compileOnly(immutablesDependency)
+    annotationProcessor(immutablesDependency)
+    testCompileOnly(immutablesDependency)
+    testAnnotationProcessor(immutablesDependency)
 
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

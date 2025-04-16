@@ -7,10 +7,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
+import com.consentframework.consentexpiryprocessor.domain.entities.ActiveConsentWithExpiryTime;
 import com.consentframework.consentexpiryprocessor.domain.repositories.ConsentRepository;
 import com.consentframework.consentexpiryprocessor.infrastructure.repositories.InMemoryConsentRepository;
-import com.consentframework.consentexpiryprocessor.testcommon.utils.ConsentGenerator;
-import com.consentframework.consentmanagement.api.models.Consent;
+import com.consentframework.consentexpiryprocessor.testcommon.utils.ActiveConsentWithExpiryTimeGenerator;
 import com.consentframework.shared.api.domain.pagination.ListPage;
 import org.junit.jupiter.api.Test;
 
@@ -44,7 +44,7 @@ class AutoExpireConsentsActivityTest {
     void executeWhenNullResultsOnPage() {
         final InMemoryConsentRepository repository = mock(InMemoryConsentRepository.class);
         final Optional<String> expectedGetActiveConsentsInput = Optional.empty();
-        final ListPage<Consent> mockPageConsents = new ListPage<>(null, Optional.empty());
+        final ListPage<ActiveConsentWithExpiryTime> mockPageConsents = new ListPage<>(null, Optional.empty());
         doReturn(mockPageConsents).when(repository).getActiveConsentsWithExpiryTimes(expectedGetActiveConsentsInput);
 
         new AutoExpireConsentsActivity(repository).execute();
@@ -54,20 +54,20 @@ class AutoExpireConsentsActivityTest {
 
     @Test
     void executeWhenMultiplePageResults() {
-        final List<Consent> consents = List.of(
-            ConsentGenerator.generateConsent(UUID.randomUUID().toString(), nowPlusMinutes(-60 * 24 * 7)),
-            ConsentGenerator.generateConsent(UUID.randomUUID().toString(), nowPlusMinutes(-60 * 24 * 2)),
-            ConsentGenerator.generateConsent(UUID.randomUUID().toString(), nowPlusMinutes(-60 * 24)),
-            ConsentGenerator.generateConsent(UUID.randomUUID().toString(), nowPlusMinutes(-60 * 2)),
-            ConsentGenerator.generateConsent(UUID.randomUUID().toString(), nowPlusMinutes(-1)),
-            ConsentGenerator.generateConsent(UUID.randomUUID().toString(), nowPlusMinutes(10)),
-            ConsentGenerator.generateConsent(UUID.randomUUID().toString(), nowPlusMinutes(240))
+        final List<ActiveConsentWithExpiryTime> consents = List.of(
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), nowPlusMinutes(-60 * 24 * 7)),
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), nowPlusMinutes(-60 * 24 * 2)),
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), nowPlusMinutes(-60 * 24)),
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), nowPlusMinutes(-60 * 2)),
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), nowPlusMinutes(-1)),
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), nowPlusMinutes(10)),
+            ActiveConsentWithExpiryTimeGenerator.generate(UUID.randomUUID().toString(), nowPlusMinutes(240))
         );
         final InMemoryConsentRepository repository = spy(new InMemoryConsentRepository(consents));
 
         new AutoExpireConsentsActivity(repository).execute();
 
-        final List<String> partitionKeys = consents.stream().map(repository::getPartitionKey).toList();
+        final List<String> partitionKeys = consents.stream().map(ActiveConsentWithExpiryTime::id).toList();
 
         verify(repository).getActiveConsentsWithExpiryTimes(Optional.empty());
         verify(repository).getActiveConsentsWithExpiryTimes(Optional.of(partitionKeys.get(2)));
@@ -84,6 +84,6 @@ class AutoExpireConsentsActivityTest {
     }
 
     private OffsetDateTime nowPlusMinutes(final int minutes) {
-        return OffsetDateTime.now().withOffsetSameLocal(ZoneOffset.UTC).plusMinutes(minutes);
+        return OffsetDateTime.now().withOffsetSameInstant(ZoneOffset.UTC).plusMinutes(minutes);
     }
 }

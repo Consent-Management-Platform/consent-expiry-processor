@@ -1,8 +1,9 @@
 package com.consentframework.consentexpiryprocessor.usecases.activities;
 
+import com.consentframework.consentexpiryprocessor.domain.entities.ActiveConsentWithExpiryTime;
 import com.consentframework.consentexpiryprocessor.domain.repositories.ConsentRepository;
-import com.consentframework.consentmanagement.api.models.Consent;
 import com.consentframework.shared.api.domain.pagination.ListPage;
+import com.consentframework.shared.api.infrastructure.mappers.DynamoDbConsentExpiryTimeConverter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -38,12 +39,12 @@ public class AutoExpireConsentsActivity {
      * of expiry time (oldest to newest).
      */
     public void execute() {
-        ListPage<Consent> currentPageConsents = consentRepository.getActiveConsentsWithExpiryTimes(Optional.empty());
+        ListPage<ActiveConsentWithExpiryTime> currentPageConsents = consentRepository.getActiveConsentsWithExpiryTimes(Optional.empty());
 
         while (currentPageConsents != null && currentPageConsents.resultsOnPage() != null) {
             logger.info("Processing page of {} active consents with expiry times.", currentPageConsents.resultsOnPage().size());
 
-            for (final Consent consent : currentPageConsents.resultsOnPage()) {
+            for (final ActiveConsentWithExpiryTime consent : currentPageConsents.resultsOnPage()) {
                 final boolean isPastExpiryTime = isPastExpiryTime(consent);
                 if (!isPastExpiryTime) {
                     logger.info("Remaining consent expiry times are in the future, ending auto-expire consent activity.");
@@ -63,11 +64,11 @@ public class AutoExpireConsentsActivity {
      *
      * @param consent The consent to update.
      */
-    private void expireConsent(final Consent consent) {
-        final String consentPartitionKey = consentRepository.getPartitionKey(consent);
-        logger.info("Consent with partition key {} has expiryTime {} in the past, updating status to EXPIRED.",
-            consentPartitionKey, consent.getExpiryTime());
-        final String nextConsentVersion = String.valueOf(consent.getConsentVersion() + 1);
+    private void expireConsent(final ActiveConsentWithExpiryTime consent) {
+        final String consentPartitionKey = consent.id();
+        logger.info("Consent with partition key {} has expiryTimeId {} with expiryTime in the past, updating status to EXPIRED.",
+            consentPartitionKey, consent.expiryTimeId());
+        final String nextConsentVersion = String.valueOf(consent.consentVersion() + 1);
         consentRepository.expireConsent(consentPartitionKey, nextConsentVersion);
     }
 
@@ -77,9 +78,10 @@ public class AutoExpireConsentsActivity {
      * @param consent The consent to check.
      * @return True if the consent's expiryTime is in the past, false otherwise.
      */
-    private boolean isPastExpiryTime(final Consent consent) {
-        final OffsetDateTime currentTime = OffsetDateTime.now().withOffsetSameLocal(ZoneOffset.UTC);
-        return consent.getExpiryTime().isBefore(currentTime);
+    private boolean isPastExpiryTime(final ActiveConsentWithExpiryTime consent) {
+        final OffsetDateTime currentTime = OffsetDateTime.now().withOffsetSameInstant(ZoneOffset.UTC);
+        final OffsetDateTime expiryTime = DynamoDbConsentExpiryTimeConverter.toOffsetDateTimeFromExpiryTimeId(consent.expiryTimeId());
+        return expiryTime.isBefore(currentTime);
     }
 
     /**
@@ -88,7 +90,7 @@ public class AutoExpireConsentsActivity {
      * @param currentPageConsents The current page of consents.
      * @return The next page of consents, or null if there are no more pages.
      */
-    private ListPage<Consent> getNextPage(final ListPage<Consent> currentPageConsents) {
+    private ListPage<ActiveConsentWithExpiryTime> getNextPage(final ListPage<ActiveConsentWithExpiryTime> currentPageConsents) {
         final Optional<String> nextPageToken = currentPageConsents.nextPageToken();
         if (nextPageToken.isPresent()) {
             logger.info("Retrieving next page of consents.");
