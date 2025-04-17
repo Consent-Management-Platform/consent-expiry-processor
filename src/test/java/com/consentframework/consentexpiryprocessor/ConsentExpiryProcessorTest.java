@@ -4,6 +4,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.amazonaws.services.lambda.runtime.Context;
+import com.consentframework.consentexpiryprocessor.domain.repositories.ConsentRepository;
+import com.consentframework.consentexpiryprocessor.infrastructure.repositories.InMemoryConsentRepository;
 import org.junit.jupiter.api.Test;
 
 class ConsentExpiryProcessorTest {
@@ -12,7 +14,8 @@ class ConsentExpiryProcessorTest {
         final Context mockContext = mock(Context.class);
         when(mockContext.getAwsRequestId()).thenReturn("test-request-id");
 
-        final ConsentExpiryProcessor processor = new ConsentExpiryProcessor();
+        final ConsentRepository consentRepository = new InMemoryConsentRepository();
+        final ConsentExpiryProcessor processor = new ConsentExpiryProcessor(consentRepository);
         processor.handleRequest(mockContext);
     }
 }
