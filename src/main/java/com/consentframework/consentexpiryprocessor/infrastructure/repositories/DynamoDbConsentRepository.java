@@ -6,6 +6,8 @@ import com.consentframework.consentexpiryprocessor.domain.repositories.ConsentRe
 import com.consentframework.consentexpiryprocessor.infrastructure.mappers.DynamoDbExpiryHourTokenMapper;
 import com.consentframework.shared.api.domain.pagination.ListPage;
 import com.consentframework.shared.api.infrastructure.entities.DynamoDbActiveConsentWithExpiryTime;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.core.pagination.sync.SdkIterable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Expression;
@@ -25,6 +27,8 @@ import java.util.Optional;
  * DynamoDB implementation of the consent repository.
  */
 public class DynamoDbConsentRepository implements ConsentRepository {
+    private static final Logger logger = LogManager.getLogger(DynamoDbConsentRepository.class);
+
     private static final String EXPIRED_STATUS = "EXPIRED";
     private static final String EXPIRE_CONSENT_UPDATE_EXPRESSION =
         "set #consentStatus = :expiredStatus, #expiryHour = :null, #expiryTimeId = :null, #consentVersion = :nextConsentVersion";
@@ -54,12 +58,15 @@ public class DynamoDbConsentRepository implements ConsentRepository {
     @Override
     public ListPage<ActiveConsentWithExpiryTime> getActiveConsentsWithExpiryHour(final String expiryHour,
             final Optional<String> pageToken) {
+        final String context = String.format("expiry hour %s, pageToken %s", expiryHour, pageToken.orElse("null"));
+        logger.info("Retrieving active consents", context);
         final QueryEnhancedRequest queryRequest = buildGetConsentsToExpireQueryRequest(expiryHour, pageToken);
 
         final SdkIterable<Page<DynamoDbActiveConsentWithExpiryTime>> queryResults = consentTable
             .index(DynamoDbActiveConsentWithExpiryTime.ACTIVE_CONSENTS_BY_EXPIRY_HOUR_GSI_NAME)
             .query(queryRequest);
         if (queryResults == null) {
+            logger.info("Received null query results", context);
             return null;
         }
 
@@ -77,6 +84,8 @@ public class DynamoDbConsentRepository implements ConsentRepository {
                         .build()
                     )
                     .toList();
+                logger.info("Received page of {} consents with nextPageToken {}",
+                    consents.size(), nextPageToken, context);
                 return new ListPage<ActiveConsentWithExpiryTime>(consents, nextPageToken);
             })
             .orElse(null);
@@ -87,8 +96,10 @@ public class DynamoDbConsentRepository implements ConsentRepository {
      */
     @Override
     public void expireConsent(final String id, final String updatedVersion) {
+        logger.info("Updating consent with id {} to expired, with updated version {}", id, updatedVersion);
         final UpdateItemRequest expireConsentRequest = buildExpireConsentRequest(id, updatedVersion);
         this.ddbClient.updateItem(expireConsentRequest);
+        logger.info("Successfullyl expired consent with id {}", id);
     }
 
     private UpdateItemRequest buildExpireConsentRequest(final String id, final String updatedVersion) {
