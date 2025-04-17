@@ -59,14 +59,14 @@ public class DynamoDbConsentRepository implements ConsentRepository {
     public ListPage<ActiveConsentWithExpiryTime> getActiveConsentsWithExpiryHour(final String expiryHour,
             final Optional<String> pageToken) {
         final String context = String.format("expiry hour %s, pageToken %s", expiryHour, pageToken.orElse("null"));
-        logger.info("Retrieving active consents", context);
+        logger.info("Retrieving active consents with {}", context);
         final QueryEnhancedRequest queryRequest = buildGetConsentsToExpireQueryRequest(expiryHour, pageToken);
 
         final SdkIterable<Page<DynamoDbActiveConsentWithExpiryTime>> queryResults = consentTable
             .index(DynamoDbActiveConsentWithExpiryTime.ACTIVE_CONSENTS_BY_EXPIRY_HOUR_GSI_NAME)
             .query(queryRequest);
         if (queryResults == null) {
-            logger.info("Received null query results", context);
+            logger.info("Received null query results for {}", context);
             return null;
         }
 
@@ -84,7 +84,7 @@ public class DynamoDbConsentRepository implements ConsentRepository {
                         .build()
                     )
                     .toList();
-                logger.info("Received page of {} consents with nextPageToken {}",
+                logger.info("Received page of {} consents with nextPageToken {} when querying {}",
                     consents.size(), nextPageToken, context);
                 return new ListPage<ActiveConsentWithExpiryTime>(consents, nextPageToken);
             })
@@ -99,7 +99,7 @@ public class DynamoDbConsentRepository implements ConsentRepository {
         logger.info("Updating consent with id {} to expired, with updated version {}", id, updatedVersion);
         final UpdateItemRequest expireConsentRequest = buildExpireConsentRequest(id, updatedVersion);
         this.ddbClient.updateItem(expireConsentRequest);
-        logger.info("Successfullyl expired consent with id {}", id);
+        logger.info("Successfully expired consent with id {}", id);
     }
 
     private UpdateItemRequest buildExpireConsentRequest(final String id, final String updatedVersion) {
