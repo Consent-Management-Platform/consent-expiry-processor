@@ -1,5 +1,6 @@
 package com.consentframework.consentexpiryprocessor.infrastructure.repositories;
 
+import com.consentframework.consentexpiryprocessor.domain.constants.ActiveConsentWithExpiryTimeAttributeName;
 import com.consentframework.consentexpiryprocessor.domain.entities.ActiveConsentWithExpiryTime;
 import com.consentframework.consentexpiryprocessor.domain.repositories.ConsentRepository;
 import com.consentframework.consentexpiryprocessor.infrastructure.mappers.DynamoDbExpiryHourTokenMapper;
@@ -7,11 +8,14 @@ import com.consentframework.shared.api.domain.pagination.ListPage;
 import com.consentframework.shared.api.infrastructure.entities.DynamoDbActiveConsentWithExpiryTime;
 import software.amazon.awssdk.core.pagination.sync.SdkIterable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Expression;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 import java.util.List;
 import java.util.Map;
@@ -21,14 +25,26 @@ import java.util.Optional;
  * DynamoDB implementation of the consent repository.
  */
 public class DynamoDbConsentRepository implements ConsentRepository {
+    private static final String EXPIRED_STATUS = "EXPIRED";
+    private static final String EXPIRE_CONSENT_UPDATE_EXPRESSION =
+        "set #consentStatus = :expiredStatus, #expiryHour = :null, #expiryTimeId = :null, #consentVersion = :nextConsentVersion";
+
+    private final DynamoDbClient ddbClient;
     private final DynamoDbTable<DynamoDbActiveConsentWithExpiryTime> consentTable;
+
+    private static final Expression CONSENT_ID_EXISTS_EXPRESSION = Expression.builder()
+        .expression("attribute_exists(id)")
+        .build();
 
     /**
      * Initializes a new DynamoDB consent repository.
      *
-     * @param consentTable The DynamoDB table to use for storing consents.
+     * @param ddbClient The DynamoDB client used to update items.
+     * @param consentTable The DynamoDB table used to query active consents with expiry times.
      */
-    public DynamoDbConsentRepository(final DynamoDbTable<DynamoDbActiveConsentWithExpiryTime> consentTable) {
+    public DynamoDbConsentRepository(final DynamoDbClient ddbClient,
+            final DynamoDbTable<DynamoDbActiveConsentWithExpiryTime> consentTable) {
+        this.ddbClient = ddbClient;
         this.consentTable = consentTable;
     }
 
@@ -68,15 +84,42 @@ public class DynamoDbConsentRepository implements ConsentRepository {
 
     /**
      * Updates the status of a consent to expired.
-     *
-     * TODO: Implement logic to submit a DynamoDB UpdateItem API request to:
-     * 1. Update the consent status to "EXPIRED".
-     * 2. Remove the consent's autoExpireId attribute.
-     * 3. Increment consentVersion by 1.
      */
     @Override
     public void expireConsent(final String id, final String updatedVersion) {
-        throw new UnsupportedOperationException("Unimplemented method 'expireConsent'");
+        final UpdateItemRequest expireConsentRequest = buildExpireConsentRequest(id, updatedVersion);
+        this.ddbClient.updateItem(expireConsentRequest);
+    }
+
+    private UpdateItemRequest buildExpireConsentRequest(final String id, final String updatedVersion) {
+        final Integer updatedVersionInt = Integer.parseInt(updatedVersion);
+        final Integer lastVersionInt = updatedVersionInt - 1;
+        final Expression storedConsentHasVersionExpression = Expression.builder()
+            .expression("#consentVersion = :expectedLastVersion")
+            .putExpressionName("#consentVersion", "consentVersion")
+            .putExpressionValue(":expectedLastVersion", AttributeValue.builder().n(lastVersionInt.toString()).build())
+            .build();
+        final Expression conditionExpression = CONSENT_ID_EXISTS_EXPRESSION.and(storedConsentHasVersionExpression);
+
+        final Map<String, String> expressionAttributeNames = Map.of(
+            "#consentStatus", "consentStatus",
+            "#consentVersion", "consentVersion",
+            "#expiryHour", ActiveConsentWithExpiryTimeAttributeName.EXPIRY_HOUR.getValue(),
+            "#expiryTimeId", ActiveConsentWithExpiryTimeAttributeName.EXPIRY_TIME_ID.getValue()
+        );
+        final Map<String, AttributeValue> expressionAttributeValues = Map.of(
+            ":expiredStatus", AttributeValue.builder().s(EXPIRED_STATUS).build(),
+            ":nextConsentVersion", AttributeValue.builder().n(updatedVersion).build(),
+            ":null", AttributeValue.builder().nul(true).build()
+        );
+
+        return UpdateItemRequest.builder()
+            .tableName(DynamoDbActiveConsentWithExpiryTime.TABLE_NAME)
+            .updateExpression(EXPIRE_CONSENT_UPDATE_EXPRESSION)
+            .conditionExpression(conditionExpression.expression())
+            .expressionAttributeNames(expressionAttributeNames)
+            .expressionAttributeValues(expressionAttributeValues)
+            .build();
     }
 
     private QueryEnhancedRequest buildGetConsentsToExpireQueryRequest(final String expiryHour, final Optional<String> pageToken) {
@@ -85,6 +128,7 @@ public class DynamoDbConsentRepository implements ConsentRepository {
         final QueryConditional queryCondition = QueryConditional.keyEqualTo(Key.builder()
             .partitionValue(expiryHour)
             .build());
+
         return QueryEnhancedRequest.builder()
             .queryConditional(queryCondition)
             .exclusiveStartKey(exclusiveStartKey)
