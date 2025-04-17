@@ -112,6 +112,9 @@ public class DynamoDbConsentRepository implements ConsentRepository {
             .build();
         final Expression conditionExpression = CONSENT_ID_EXISTS_EXPRESSION.and(storedConsentHasVersionExpression);
 
+        final Map<String, AttributeValue> key = Map.of(
+            "id", AttributeValue.builder().s(id).build()
+        );
         final Map<String, String> expressionAttributeNames = Map.of(
             "#consentStatus", "consentStatus",
             "#consentVersion", "consentVersion",
@@ -126,6 +129,7 @@ public class DynamoDbConsentRepository implements ConsentRepository {
 
         return UpdateItemRequest.builder()
             .tableName(DynamoDbActiveConsentWithExpiryTime.TABLE_NAME)
+            .key(key)
             .updateExpression(EXPIRE_CONSENT_UPDATE_EXPRESSION)
             .conditionExpression(conditionExpression.expression())
             .expressionAttributeNames(expressionAttributeNames)
