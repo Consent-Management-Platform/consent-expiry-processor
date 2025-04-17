@@ -1,6 +1,5 @@
 package com.consentframework.consentexpiryprocessor.infrastructure.repositories;
 
-import com.consentframework.consentexpiryprocessor.domain.constants.ActiveConsentWithExpiryTimeAttributeName;
 import com.consentframework.consentexpiryprocessor.domain.entities.ActiveConsentWithExpiryTime;
 import com.consentframework.consentexpiryprocessor.domain.repositories.ConsentRepository;
 import com.consentframework.consentexpiryprocessor.infrastructure.mappers.DynamoDbExpiryHourTokenMapper;
@@ -99,9 +98,11 @@ public class DynamoDbConsentRepository implements ConsentRepository {
         final Integer updatedVersionInt = Integer.parseInt(updatedVersion);
         final Integer lastVersionInt = updatedVersionInt - 1;
 
-        final String updateExpression = "set #consentStatus = :expiredStatus, "
-            + "#expiryTimeId = :null, "
-            + "#consentVersion = :nextConsentVersion";
+        // Use REMOVE to remove GSI key attributes, and SET to update other attributes.
+        // Ref: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.UpdateExpressions.html#Expressions.UpdateExpressions.Multiple
+        final String updateExpression = "SET #consentStatus = :expiredStatus, "
+            + "#consentVersion = :nextConsentVersion "
+            + "REMOVE #expiryHour, #expiryTimeId";
 
         final String conditionExpression = "attribute_exists(id) AND #consentVersion = :expectedLastVersion";
 
@@ -111,13 +112,13 @@ public class DynamoDbConsentRepository implements ConsentRepository {
         final Map<String, String> expressionAttributeNames = Map.of(
             "#consentStatus", "consentStatus",
             "#consentVersion", "consentVersion",
-            "#expiryTimeId", ActiveConsentWithExpiryTimeAttributeName.EXPIRY_TIME_ID.getValue()
+            "#expiryHour", "expiryHour",
+            "#expiryTimeId", "expiryTimeId"
         );
         final Map<String, AttributeValue> expressionAttributeValues = Map.of(
             ":expectedLastVersion", AttributeValue.builder().n(lastVersionInt.toString()).build(),
             ":expiredStatus", AttributeValue.builder().s(EXPIRED_STATUS).build(),
-            ":nextConsentVersion", AttributeValue.builder().n(updatedVersion).build(),
-            ":null", AttributeValue.builder().nul(true).build()
+            ":nextConsentVersion", AttributeValue.builder().n(updatedVersion).build()
         );
 
         return UpdateItemRequest.builder()
