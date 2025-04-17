@@ -100,7 +100,6 @@ public class DynamoDbConsentRepository implements ConsentRepository {
         final Integer lastVersionInt = updatedVersionInt - 1;
 
         final String updateExpression = "set #consentStatus = :expiredStatus, "
-            + "#expiryHour = :null, "
             + "#expiryTimeId = :null, "
             + "#consentVersion = :nextConsentVersion";
 
@@ -112,7 +111,6 @@ public class DynamoDbConsentRepository implements ConsentRepository {
         final Map<String, String> expressionAttributeNames = Map.of(
             "#consentStatus", "consentStatus",
             "#consentVersion", "consentVersion",
-            "#expiryHour", ActiveConsentWithExpiryTimeAttributeName.EXPIRY_HOUR.getValue(),
             "#expiryTimeId", ActiveConsentWithExpiryTimeAttributeName.EXPIRY_TIME_ID.getValue()
         );
         final Map<String, AttributeValue> expressionAttributeValues = Map.of(
