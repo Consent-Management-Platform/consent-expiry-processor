@@ -36,6 +36,9 @@ dependencies {
     // AWS Lambda SDK
     implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
 
+    // AWS CloudWatch SDK
+    implementation("software.amazon.awssdk:cloudwatch:2.31.23")
+
     implementation(libs.guava)
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.1")
     implementation("jakarta.annotation:jakarta.annotation-api:3.0.0")
