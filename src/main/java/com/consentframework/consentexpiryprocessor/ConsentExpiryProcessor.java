@@ -41,11 +41,10 @@ public class ConsentExpiryProcessor {
             DynamoDbActiveConsentWithExpiryTime.TABLE_NAME,
             TableSchema.fromClass(DynamoDbActiveConsentWithExpiryTime.class));
 
-        this.consentRepository = new DynamoDbConsentRepository(ddbClient, consentTable);
-        this.autoExpireConsentsActivity = new AutoExpireConsentsActivity(consentRepository);
-
         final CloudWatchClient cloudWatchClient = CloudWatchClient.create();
         this.metricsHandler = new CloudWatchMetricsHandler(cloudWatchClient);
+        this.consentRepository = new DynamoDbConsentRepository(ddbClient, consentTable, metricsHandler);
+        this.autoExpireConsentsActivity = new AutoExpireConsentsActivity(consentRepository);
     }
 
     /**

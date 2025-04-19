@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.consentframework.consentexpiryprocessor.domain.constants.ActiveConsentWithExpiryTimeAttributeName;
 import com.consentframework.consentexpiryprocessor.domain.entities.ActiveConsentWithExpiryTime;
 import com.consentframework.consentexpiryprocessor.domain.repositories.ConsentRepository;
+import com.consentframework.consentexpiryprocessor.infrastructure.metrics.CloudWatchMetricsHandler;
 import com.consentframework.consentexpiryprocessor.testcommon.constants.TestConstants;
 import com.consentframework.shared.api.domain.pagination.ListPage;
 import com.consentframework.shared.api.infrastructure.entities.DynamoDbActiveConsentWithExpiryTime;
@@ -29,6 +30,8 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.enhanced.dynamodb.model.PageIterable;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
+import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
+import software.amazon.awssdk.services.cloudwatch.model.PutMetricDataRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
@@ -92,6 +95,10 @@ class DynamoDbConsentRepositoryTest {
     );
 
     @Mock
+    private CloudWatchClient cloudWatchClient;
+    private CloudWatchMetricsHandler metricsHandler;
+
+    @Mock
     private DynamoDbClient ddbClient;
 
     @Mock
@@ -103,6 +110,10 @@ class DynamoDbConsentRepositoryTest {
     @SuppressWarnings("unchecked")
     @BeforeEach
     void setup() {
+        cloudWatchClient = mock(CloudWatchClient.class);
+        when(cloudWatchClient.putMetricData(any(PutMetricDataRequest.class))).thenReturn(null);
+        metricsHandler = new CloudWatchMetricsHandler(cloudWatchClient);
+
         ddbClient = mock(DynamoDbClient.class);
         consentTable = (DynamoDbTable<DynamoDbActiveConsentWithExpiryTime>) mock(DynamoDbTable.class);
         queryResults = (SdkIterable<Page<DynamoDbActiveConsentWithExpiryTime>>) mock(PageIterable.class);
@@ -113,7 +124,7 @@ class DynamoDbConsentRepositoryTest {
     void getActiveConsentsWithExpiryTimes_whenNullQueryResults() {
         mockIndexQueryResults(null);
 
-        final ConsentRepository repository = new DynamoDbConsentRepository(ddbClient, consentTable);
+        final ConsentRepository repository = new DynamoDbConsentRepository(ddbClient, consentTable, metricsHandler);
         assertNull(repository.getActiveConsentsWithExpiryHour(TestConstants.TEST_EXPIRY_HOUR, Optional.of(NEXT_TOKEN_JSON_STRING)));
     }
 
@@ -125,7 +136,7 @@ class DynamoDbConsentRepositoryTest {
         when(queryResults.stream()).thenReturn(Stream.of(pageResults));
         mockIndexQueryResults(queryResults);
 
-        final ConsentRepository repository = new DynamoDbConsentRepository(ddbClient, consentTable);
+        final ConsentRepository repository = new DynamoDbConsentRepository(ddbClient, consentTable, metricsHandler);
         final ListPage<ActiveConsentWithExpiryTime> matchingConsentsPage = repository.getActiveConsentsWithExpiryHour(
             TestConstants.TEST_EXPIRY_HOUR, Optional.empty());
         assertNotNull(matchingConsentsPage);
@@ -149,7 +160,7 @@ class DynamoDbConsentRepositoryTest {
         when(queryResults.stream()).thenReturn(Stream.of(page1, page2));
         mockIndexQueryResults(queryResults);
 
-        final ConsentRepository repository = new DynamoDbConsentRepository(ddbClient, consentTable);
+        final ConsentRepository repository = new DynamoDbConsentRepository(ddbClient, consentTable, metricsHandler);
         final ListPage<ActiveConsentWithExpiryTime> matchingConsentsPage = repository.getActiveConsentsWithExpiryHour(
             TestConstants.TEST_EXPIRY_HOUR, Optional.empty());
         assertNotNull(matchingConsentsPage);
@@ -168,7 +179,7 @@ class DynamoDbConsentRepositoryTest {
     @Test
     void expireConsent() {
         doReturn(UpdateItemResponse.builder().build()).when(ddbClient).updateItem(any(UpdateItemRequest.class));
-        final ConsentRepository repository = new DynamoDbConsentRepository(ddbClient, consentTable);
+        final ConsentRepository repository = new DynamoDbConsentRepository(ddbClient, consentTable, metricsHandler);
 
         repository.expireConsent(TestConstants.TEST_PARTITION_KEY, "2");
 

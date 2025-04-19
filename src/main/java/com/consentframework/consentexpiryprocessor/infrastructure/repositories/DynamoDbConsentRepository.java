@@ -3,6 +3,7 @@ package com.consentframework.consentexpiryprocessor.infrastructure.repositories;
 import com.consentframework.consentexpiryprocessor.domain.entities.ActiveConsentWithExpiryTime;
 import com.consentframework.consentexpiryprocessor.domain.repositories.ConsentRepository;
 import com.consentframework.consentexpiryprocessor.infrastructure.mappers.DynamoDbExpiryHourTokenMapper;
+import com.consentframework.consentexpiryprocessor.infrastructure.metrics.CloudWatchMetricsHandler;
 import com.consentframework.shared.api.domain.pagination.ListPage;
 import com.consentframework.shared.api.infrastructure.entities.DynamoDbActiveConsentWithExpiryTime;
 import org.apache.logging.log4j.LogManager;
@@ -31,6 +32,7 @@ public class DynamoDbConsentRepository implements ConsentRepository {
 
     private final DynamoDbClient ddbClient;
     private final DynamoDbTable<DynamoDbActiveConsentWithExpiryTime> consentTable;
+    private final CloudWatchMetricsHandler metricsHandler;
 
     /**
      * Initializes a new DynamoDB consent repository.
@@ -39,9 +41,11 @@ public class DynamoDbConsentRepository implements ConsentRepository {
      * @param consentTable The DynamoDB table used to query active consents with expiry times.
      */
     public DynamoDbConsentRepository(final DynamoDbClient ddbClient,
-            final DynamoDbTable<DynamoDbActiveConsentWithExpiryTime> consentTable) {
+            final DynamoDbTable<DynamoDbActiveConsentWithExpiryTime> consentTable,
+            final CloudWatchMetricsHandler metricsHandler) {
         this.ddbClient = ddbClient;
         this.consentTable = consentTable;
+        this.metricsHandler = metricsHandler;
     }
 
     /**
