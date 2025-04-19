@@ -28,6 +28,7 @@ import java.util.Optional;
 public class DynamoDbConsentRepository implements ConsentRepository {
     private static final Logger logger = LogManager.getLogger(DynamoDbConsentRepository.class);
 
+    public static final String EXPIRED_CONSENT_METRIC_NAME = "ExpiredConsent";
     private static final String EXPIRED_STATUS = "EXPIRED";
 
     private final DynamoDbClient ddbClient;
@@ -95,7 +96,9 @@ public class DynamoDbConsentRepository implements ConsentRepository {
         logger.info("Updating consent with id {} to expired, with updated version {}", id, updatedVersion);
         final UpdateItemRequest expireConsentRequest = buildExpireConsentRequest(id, updatedVersion);
         this.ddbClient.updateItem(expireConsentRequest);
+
         logger.info("Successfully expired consent with id {}", id);
+        this.metricsHandler.publishCountMetric(EXPIRED_CONSENT_METRIC_NAME, 1);
     }
 
     private UpdateItemRequest buildExpireConsentRequest(final String id, final String updatedVersion) {

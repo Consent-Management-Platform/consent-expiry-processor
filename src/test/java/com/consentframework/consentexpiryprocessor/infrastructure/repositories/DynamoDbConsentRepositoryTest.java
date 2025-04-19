@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -15,6 +16,7 @@ import com.consentframework.consentexpiryprocessor.domain.entities.ActiveConsent
 import com.consentframework.consentexpiryprocessor.domain.repositories.ConsentRepository;
 import com.consentframework.consentexpiryprocessor.infrastructure.metrics.CloudWatchMetricsHandler;
 import com.consentframework.consentexpiryprocessor.testcommon.constants.TestConstants;
+import com.consentframework.consentexpiryprocessor.testcommon.matchers.PutMetricDataRequestMatcher;
 import com.consentframework.shared.api.domain.pagination.ListPage;
 import com.consentframework.shared.api.infrastructure.entities.DynamoDbActiveConsentWithExpiryTime;
 import com.consentframework.shared.api.infrastructure.mappers.DynamoDbConsentExpiryTimeConverter;
@@ -111,7 +113,6 @@ class DynamoDbConsentRepositoryTest {
     @BeforeEach
     void setup() {
         cloudWatchClient = mock(CloudWatchClient.class);
-        when(cloudWatchClient.putMetricData(any(PutMetricDataRequest.class))).thenReturn(null);
         metricsHandler = new CloudWatchMetricsHandler(cloudWatchClient);
 
         ddbClient = mock(DynamoDbClient.class);
@@ -179,11 +180,19 @@ class DynamoDbConsentRepositoryTest {
     @Test
     void expireConsent() {
         doReturn(UpdateItemResponse.builder().build()).when(ddbClient).updateItem(any(UpdateItemRequest.class));
+        when(cloudWatchClient.putMetricData(any(PutMetricDataRequest.class))).thenReturn(null);
+        metricsHandler = new CloudWatchMetricsHandler(cloudWatchClient);
         final ConsentRepository repository = new DynamoDbConsentRepository(ddbClient, consentTable, metricsHandler);
 
         repository.expireConsent(TestConstants.TEST_PARTITION_KEY, "2");
 
         verify(ddbClient).updateItem(any(UpdateItemRequest.class));
+
+        verify(cloudWatchClient).putMetricData(argThat(new PutMetricDataRequestMatcher(
+            CloudWatchMetricsHandler.METRIC_NAMESPACE,
+            DynamoDbConsentRepository.EXPIRED_CONSENT_METRIC_NAME,
+            1.0
+        )));
     }
 
     private void validateFieldsEqual(final List<DynamoDbActiveConsentWithExpiryTime> originalDbItems,
